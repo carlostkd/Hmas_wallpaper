@@ -15,7 +15,7 @@ Hacker Messages as Service (HMAS) is a live wallpaper Android app that fetches a
 1. Clone this repository to your local machine:
 
     ```bash
-    git clone https://github.com/your-username/your-repository-name.git
+    git clone https://github.com/carlostkd/Hmas_wallpaper.gitt
     ```
 
 2. Open the project in Android Studio.
