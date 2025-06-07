@@ -1,0 +1,5 @@
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:thumbnail="@drawable/ic_launcher_foreground"
+    android:description="@string/wallpaper_desc"
+    android:settingsActivity="com.hmas.api.WallpaperSettingsActivity"
+    android:previewImage="@drawable/ic_launcher_foreground" />
