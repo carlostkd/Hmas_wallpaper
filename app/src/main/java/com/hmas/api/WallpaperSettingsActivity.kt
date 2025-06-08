@@ -17,6 +17,8 @@ class WallpaperSettingsActivity : AppCompatActivity() {
     private val cardColors = arrayOf("Dark Gray", "Green Glow", "Red Alert", "Transparent")
     private val syncOptions = arrayOf("5m", "15m", "30m", "1h", "4h", "6h", "12h")
     private val PICK_IMAGE_REQUEST = 42
+    private lateinit var apiKeyInput: EditText
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -60,10 +62,6 @@ class WallpaperSettingsActivity : AppCompatActivity() {
             setSelection(cardColors.indexOf(prefs.getString("card_color", "Dark Gray")))
         }
 
-        val spinnerSync = Spinner(this).apply {
-            adapter = ArrayAdapter(this@WallpaperSettingsActivity, android.R.layout.simple_spinner_dropdown_item, syncOptions)
-            setSelection(syncOptions.indexOf(prefs.getString("sync_interval", "15m")))
-        }
 
         val cardWidths = arrayOf("Full", "Medium", "Narrow")
         val cardLines = arrayOf("4", "6", "8", "10")
@@ -128,16 +126,29 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                 val selectedPos = spinnerPosition.selectedItem.toString()
                 val selectedFont = spinnerFont.selectedItem.toString()
                 val selectedColor = spinnerColor.selectedItem.toString()
-                val selectedSync = spinnerSync.selectedItem.toString()
+                val cardWidth = spinnerCardWidth.selectedItem.toString()
+                val cardLines = spinnerCardLines.selectedItem.toString()
+                val apiKey = apiKeyInput.text.toString()
+
+                if (apiKey.length < 32) {
+                    Toast.makeText(
+                        this@WallpaperSettingsActivity,
+                        "Warning: API key is too short or missing. Some features may not work.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
                 prefs.edit()
                     .putString("card_position", selectedPos)
                     .putString("font_size", selectedFont)
                     .putString("card_color", selectedColor)
-                    .putString("sync_interval", selectedSync)
-                    .putString("card_width", spinnerCardWidth.selectedItem.toString())         // ✅ NEW
+                    .putString("card_width", spinnerCardWidth.selectedItem.toString())
                     .putString("card_lines", spinnerCardLines.selectedItem.toString())
+                    .putString("api_key", apiKey)
+                    .putBoolean("do_initial_sync", true)
                     .apply()
                 Toast.makeText(this@WallpaperSettingsActivity, "Saved", Toast.LENGTH_SHORT).show()
+                val intent = Intent("com.hmas.api.ACTION_FORCE_SYNC")
+                sendBroadcast(intent)
                 setResult(Activity.RESULT_OK)
                 finish()
             }
@@ -161,8 +172,6 @@ class WallpaperSettingsActivity : AppCompatActivity() {
             addView(spinnerFont)
             addView(sectionHeader("Card Color"))
             addView(spinnerColor)
-            addView(sectionHeader("Time Sync Interval"))
-            addView(spinnerSync)
             addView(sectionHeader("Card Width"))
             addView(spinnerCardWidth)
             addView(sectionHeader("Card Lines"))

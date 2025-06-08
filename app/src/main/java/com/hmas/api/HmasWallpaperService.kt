@@ -13,11 +13,27 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
 import android.graphics.BitmapFactory
+import android.content.Intent
+
 
 class HackerWallpaperService : WallpaperService() {
+
+
+
+
     override fun onCreateEngine(): Engine {
         return HackerEngine()
     }
+
+    companion object {
+        fun triggerImmediateFetch(context: Context) {
+            val intent = Intent(context, HackerWallpaperService::class.java).apply {
+                action = "com.hmas.api.ACTION_FORCE_SYNC"
+            }
+            context.startService(intent)
+        }
+    }
+
 
     inner class HackerEngine : Engine() {
         private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -61,11 +77,16 @@ class HackerWallpaperService : WallpaperService() {
             if (visible) {
                 loadBackgroundImage()
                 draw()
-                fetchMessage()
+
+                val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+                if (prefs.getBoolean("do_initial_sync", false)) {
+                    fetchMessage()
+                    prefs.edit().putBoolean("do_initial_sync", false).apply()
+                }
+
                 handler.post(drawRunner)
-            } else {
-                handler.removeCallbacks(drawRunner)
             }
+
         }
 
         override fun onDestroy() {
@@ -89,6 +110,7 @@ class HackerWallpaperService : WallpaperService() {
                 draw()
             }
         }
+
 
 
 

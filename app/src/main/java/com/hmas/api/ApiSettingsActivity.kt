@@ -188,46 +188,52 @@ class ApiSettingsActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val params = mutableListOf<String>()
-
                 val apiKey = apiKeyInput.text.toString()
-                if (apiKey.length < 32) {
-                    Toast.makeText(this@ApiSettingsActivity, "API key too short or missing!", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
 
-                when {
-                    lastLikeSwitch.isChecked -> {
-                        params.add("last=like")
+                val hasLike = lastLikeSwitch.isChecked
+                val hasLiked = likedSwitch.isChecked
+
+                if (hasLike) {
+                    params.add("last=like")
+                } else if (hasLiked) {
+                    params.add("liked")
+                } else {
+                    val asValue = senderInput.text.toString()
+                    if (asValue.isNotEmpty()) params.add("as=$asValue")
+
+                    val msgValue = msgInput.text.toString()
+                    if (msgValue.isNotEmpty()) params.add("msg=$msgValue")
+
+                    if (enableChat.isChecked) {
+                        params.add("chat=on")
+                        params.add("chatstyle=" + spinnerStyle.selectedItem.toString())
                     }
-                    likedSwitch.isChecked -> {
-                        params.add("liked")
+
+                    if (enableTalk.isChecked) {
+                        params.add("talk=on")
+                        if (talkInput.text.isNotEmpty()) params.add("talk=" + talkInput.text.toString())
+                        if (talkColorInput.text.isNotEmpty()) params.add("talkcolor=" + talkColorInput.text.toString())
                     }
-                    else -> {
-                        if (enableChat.isChecked) {
-                            params.add("chat=on")
-                            params.add("chatstyle=" + spinnerStyle.selectedItem.toString())
-                        }
-                        if (enableTalk.isChecked) {
-                            params.add("talk=on")
-                            if (talkInput.text.isNotEmpty()) params.add("talk=" + talkInput.text.toString())
-                            if (talkColorInput.text.isNotEmpty()) params.add("talkcolor=" + talkColorInput.text.toString())
-                        }
-                        if (senderInput.text.isNotEmpty()) params.add("as=" + senderInput.text.toString())
-                        if (msgInput.text.isNotEmpty()) params.add("msg=" + msgInput.text.toString())
-                        if (maxInput.text.isNotEmpty()) params.add("max=" + maxInput.text.toString())
-                        val diffText = diffInput.text.toString()
-                        if (diffText.isNotEmpty()) {
-                            params.add("diff=" + diffText)
-                            params.add("diffmode=" + spinnerDiff.selectedItem.toString())
-                        }
+
+                    if (maxInput.text.isNotEmpty()) params.add("max=" + maxInput.text.toString())
+
+                    val diffText = diffInput.text.toString()
+                    if (diffText.isNotEmpty()) {
+                        params.add("diff=$diffText")
+                        params.add("diffmode=" + spinnerDiff.selectedItem.toString())
+                    }
+
+                    if (spinnerFormat.selectedItem.toString() != "json") {
                         params.add("format=" + spinnerFormat.selectedItem.toString())
-                        if (alertsSwitch.isChecked) params.add("alerts")
-                        if (severityInput.text.isNotEmpty()) params.add("severity=" + severityInput.text.toString())
-                        if (typesSwitch.isChecked) params.add("types=on")
                     }
+
+                    if (alertsSwitch.isChecked) params.add("alerts")
+                    if (severityInput.text.isNotEmpty()) params.add("severity=" + severityInput.text.toString())
+                    if (typesSwitch.isChecked) params.add("types=on")
                 }
 
                 val finalQuery = params.joinToString("&")
+
                 prefs.edit()
                     .putString("api_config", finalQuery)
                     .putString("api_key", apiKey)
@@ -238,6 +244,7 @@ class ApiSettingsActivity : AppCompatActivity() {
                 setResult(Activity.RESULT_OK)
                 finish()
             }
+
         }
 
         layout.apply {
