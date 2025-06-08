@@ -65,6 +65,20 @@ class WallpaperSettingsActivity : AppCompatActivity() {
             setSelection(syncOptions.indexOf(prefs.getString("sync_interval", "15m")))
         }
 
+        val cardWidths = arrayOf("Full", "Medium", "Narrow")
+        val cardLines = arrayOf("4", "6", "8", "10")
+
+        val spinnerCardWidth = Spinner(this).apply {
+            adapter = ArrayAdapter(this@WallpaperSettingsActivity, android.R.layout.simple_spinner_dropdown_item, cardWidths)
+            setSelection(cardWidths.indexOf(prefs.getString("card_width", "Full")))
+        }
+
+        val spinnerCardLines = Spinner(this).apply {
+            adapter = ArrayAdapter(this@WallpaperSettingsActivity, android.R.layout.simple_spinner_dropdown_item, cardLines)
+            setSelection(cardLines.indexOf(prefs.getString("card_lines", "6")))
+        }
+
+
         val selectImageBtn = Button(this).apply {
             text = "Select Background Image"
             setBackgroundColor(Color.parseColor("#4CAF50"))
@@ -120,6 +134,8 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                     .putString("font_size", selectedFont)
                     .putString("card_color", selectedColor)
                     .putString("sync_interval", selectedSync)
+                    .putString("card_width", spinnerCardWidth.selectedItem.toString())         // ✅ NEW
+                    .putString("card_lines", spinnerCardLines.selectedItem.toString())
                     .apply()
                 Toast.makeText(this@WallpaperSettingsActivity, "Saved", Toast.LENGTH_SHORT).show()
                 setResult(Activity.RESULT_OK)
@@ -147,6 +163,10 @@ class WallpaperSettingsActivity : AppCompatActivity() {
             addView(spinnerColor)
             addView(sectionHeader("Time Sync Interval"))
             addView(spinnerSync)
+            addView(sectionHeader("Card Width"))
+            addView(spinnerCardWidth)
+            addView(sectionHeader("Card Lines"))
+            addView(spinnerCardLines)
             addView(sectionHeader("Wallpaper Background"))
             addView(selectImageBtn)
             addView(clearImageBtn)

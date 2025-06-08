@@ -24,6 +24,7 @@ class HackerWallpaperService : WallpaperService() {
         private var visible = false
         private var message = "Loading..."
         private var isFetching = false
+        private var lastSyncTime: Long = 0L
         private var backgroundBitmap: Bitmap? = null
 
         private val textPaint = Paint().apply {
@@ -38,6 +39,7 @@ class HackerWallpaperService : WallpaperService() {
 
         private var cardX = 50f
         private var cardY = 300f
+
 
         private val handler = Handler(Looper.getMainLooper())
         private val drawRunner = object : Runnable {
@@ -80,6 +82,15 @@ class HackerWallpaperService : WallpaperService() {
             }
             super.onTouchEvent(event)
         }
+
+        override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            super.onSurfaceChanged(holder, format, width, height)
+            handler.post {
+                draw()
+            }
+        }
+
+
 
         private fun draw() {
             val holder = surfaceHolder
@@ -183,16 +194,23 @@ class HackerWallpaperService : WallpaperService() {
         }
 
         private fun drawCard(canvas: Canvas) {
+            val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
             val padding = 50
             val cardPadding = 40
             val cornerRadius = 30f
-
             val pageLines = wrappedLines.drop(scrollIndex).take(linesPerPage)
             val lineHeight = (textPaint.textSize + 10).toInt()
             val cardWidth = canvas.width - (padding * 2)
             val cardHeight = (lineHeight * linesPerPage) + (cardPadding * 2)
-            val cardRect = RectF(cardX, cardY, cardX + cardWidth, cardY + cardHeight)
 
+            // Dynamically calculate Y position based on selected preference and screen size
+            val cardY = when (prefs.getString("card_position", "Center")) {
+                "Top" -> 100f
+                "Bottom" -> canvas.height - cardHeight - 100f
+                else -> (canvas.height - cardHeight) / 2f
+            }
+
+            val cardRect = RectF(cardX, cardY, cardX + cardWidth, cardY + cardHeight)
             canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, cardPaint)
 
             var textY = cardY + cardPadding + textPaint.textSize
@@ -202,7 +220,18 @@ class HackerWallpaperService : WallpaperService() {
             }
         }
 
+
+
+
+
+
+
         private fun fetchMessage() {
+            val currentTime = System.currentTimeMillis()
+            val interval = getSyncIntervalMs()
+            if (currentTime - lastSyncTime < interval) return
+            lastSyncTime = currentTime
+
             if (isFetching) return
             isFetching = true
 
