@@ -1,0 +1,22 @@
+
+PLease always check the app checksum before you install!!
+
+The app checksum is :
+
+688cdb54d1fb10414391de603fed3885e10c885fe3847b218c1dbb35ddc16c6f app-release.apk
+
+Download  the APK file and add the checksum to a file.
+
+Make sure your txt file contains:
+
+688cdb54d1fb10414391de603fed3885e10c885fe3847b218c1dbb35ddc16c6f app-release.apk
+
+Then run :
+
+sha256sum -c your_text_file.txt
+
+if you get :
+
+app-release.apk: OK
+
+Its all good you can install, if you get any other result please contact me.
