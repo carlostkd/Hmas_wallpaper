@@ -17,7 +17,7 @@ class WallpaperSettingsActivity : AppCompatActivity() {
     private val cardColors = arrayOf("Dark Gray", "Green Glow", "Red Alert", "Transparent")
     private val syncOptions = arrayOf("5m", "15m", "30m", "1h", "4h", "6h", "12h")
     private val PICK_IMAGE_REQUEST = 42
-    private lateinit var apiKeyInput: EditText
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +33,6 @@ class WallpaperSettingsActivity : AppCompatActivity() {
             setPadding(40, 60, 40, 60)
             setBackgroundColor(Color.parseColor("#F5F5F5"))
         }
-
 
 
 
@@ -128,7 +127,8 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                 val selectedColor = spinnerColor.selectedItem.toString()
                 val cardWidth = spinnerCardWidth.selectedItem.toString()
                 val cardLines = spinnerCardLines.selectedItem.toString()
-                val apiKey = apiKeyInput.text.toString()
+                val apiKey = prefs.getString("api_key", "") ?: ""
+
 
                 if (apiKey.length < 32) {
                     Toast.makeText(
@@ -137,6 +137,7 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
+
                 prefs.edit()
                     .putString("card_position", selectedPos)
                     .putString("font_size", selectedFont)
@@ -146,7 +147,11 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                     .putString("api_key", apiKey)
                     .putBoolean("do_initial_sync", true)
                     .apply()
+                sendBroadcast(Intent("com.hmas.api.ACTION_RELOAD_WALLPAPER"))
+
                 Toast.makeText(this@WallpaperSettingsActivity, "Saved", Toast.LENGTH_SHORT).show()
+                val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("do_force_sync", true).apply()
                 val intent = Intent("com.hmas.api.ACTION_FORCE_SYNC")
                 sendBroadcast(intent)
                 setResult(Activity.RESULT_OK)

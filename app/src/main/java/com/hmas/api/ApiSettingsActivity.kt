@@ -1,5 +1,6 @@
 package com.hmas.api
 
+import com.hmas.api.HackerWallpaperService
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
@@ -239,6 +240,10 @@ class ApiSettingsActivity : AppCompatActivity() {
                     .putString("api_key", apiKey)
                     .putString("sync_interval", syncSpinner.selectedItem.toString())
                     .apply()
+                HackerWallpaperService.triggerImmediateFetch(this@ApiSettingsActivity)
+
+
+
 
                 Toast.makeText(this@ApiSettingsActivity, "Saved", Toast.LENGTH_SHORT).show()
                 setResult(Activity.RESULT_OK)
