@@ -2,6 +2,7 @@ package com.hmas.api
 
 import android.annotation.SuppressLint
 import android.content.*
+import androidx.core.app.NotificationCompat
 import android.graphics.*
 import android.os.*
 import android.service.wallpaper.WallpaperService
@@ -69,6 +70,14 @@ class HackerWallpaperService : WallpaperService() {
         private val wrappedLines = mutableListOf<String>()
         private var scrollIndex = 0
         private val linesPerPage = 6
+
+
+
+
+
+
+
+
 
         private val settingsUpdateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -191,24 +200,39 @@ class HackerWallpaperService : WallpaperService() {
         private fun draw() {
             val holder = surfaceHolder
             var canvas: Canvas? = null
+
             try {
                 canvas = holder.lockCanvas()
                 if (canvas != null) {
                     applyPreferences(canvas)
 
                     if (backgroundBitmap != null) {
-                        backgroundBitmap?.let { bmp ->
-                            val scale = maxOf(
-                                canvas.width.toFloat() / bmp.width,
-                                canvas.height.toFloat() / bmp.height
-                            )
-                            val scaledWidth = bmp.width * scale
-                            val scaledHeight = bmp.height * scale
-                            val left = (canvas.width - scaledWidth) / 2f
-                            val top = (canvas.height - scaledHeight) / 2f
-                            val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
-                            canvas.drawBitmap(bmp, null, destRect, null)
+                        val bmp = backgroundBitmap!!
+
+                        val screenWidth = canvas.width.toFloat()
+                        val screenHeight = canvas.height.toFloat()
+
+                        val scale = 1.02f * maxOf(
+                            screenWidth / bmp.width,
+                            screenHeight / bmp.height
+                        )
+
+                        val scaledWidth = bmp.width * scale
+                        val scaledHeight = bmp.height * scale
+
+                        val left = (screenWidth - scaledWidth) / 2f
+                        val top = (screenHeight - scaledHeight) / 2f
+
+                        val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
+
+                        val paint = Paint().apply {
+                            isAntiAlias = true
+                            isFilterBitmap = true
+                            isDither = true
                         }
+
+                        canvas.drawColor(Color.BLACK) // force clear
+                        canvas.drawBitmap(bmp, null, destRect, paint)
                     } else {
                         canvas.drawColor(Color.BLACK)
                     }
@@ -219,6 +243,7 @@ class HackerWallpaperService : WallpaperService() {
                 canvas?.let { holder.unlockCanvasAndPost(it) }
             }
         }
+
 
         private fun applyPreferences(canvas: Canvas) {
             val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
@@ -358,8 +383,16 @@ class HackerWallpaperService : WallpaperService() {
                         if (current.isNotEmpty()) wrappedLines.add(current)
                     }
 
+                    //val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+                    if (prefs.getBoolean("show_notifications", false)) {
+                        val previewText = wrappedLines.joinToString(" ").take(300)
+                        sendNotification("HMAS Update", previewText)
+                        return@launch
+                    }
+
                     scrollIndex = 0
                     message = data
+                    handler.post { draw() }
 
 
 
@@ -375,8 +408,7 @@ class HackerWallpaperService : WallpaperService() {
                         onSuccess?.invoke()
                     }
                 } catch (e: Exception) {
-                    // let this log for future updates if any error occurs
-                    //Log.e("HMAS", "Error during fetchMessage", e)
+
                     message = "Error loading message"
                     wrappedLines.clear()
                     wrappedLines.add(message)
@@ -397,20 +429,30 @@ class HackerWallpaperService : WallpaperService() {
 
         private fun loadBackgroundImage() {
             val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
-            val path = prefs.getString("background_path", null) ?: return
+            val path = prefs.getString("background_path", null)
+
+            if (path == null) {
+
+                backgroundBitmap = null
+                handler.post { draw() }
+                return
+            }
+
             try {
                 val file = File(path)
                 if (file.exists()) {
                     backgroundBitmap = BitmapFactory.decodeFile(file.absolutePath)
-                    handler.post {
-
-                        draw()
-                    }
+                } else {
+                    backgroundBitmap = null
                 }
             } catch (e: Exception) {
-                Log.e("HMAS", "Failed to load background image", e)
+                backgroundBitmap = null
+                e.printStackTrace()
             }
+
+            handler.post { draw() }
         }
+
 
 
         private fun getSyncIntervalMs(): Long {
@@ -427,5 +469,32 @@ class HackerWallpaperService : WallpaperService() {
             }
         }
     }
+
+
+    private fun sendNotification(title: String, content: String) {
+        val channelId = "hmas_alerts"
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "HMAS Alerts",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            )
+            manager.createNotificationChannel(channel)
+        }
+
+        val builder = androidx.core.app.NotificationCompat.Builder(applicationContext, channelId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(content))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+
+        manager.notify(System.currentTimeMillis().toInt(), builder.build())
+    }
+
+
 }
 
