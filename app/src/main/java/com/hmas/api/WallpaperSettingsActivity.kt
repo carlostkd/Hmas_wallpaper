@@ -96,7 +96,7 @@ class WallpaperSettingsActivity : AppCompatActivity() {
                     file.delete()
                 }
 
-                // ✅ Broadcast to refresh the wallpaper
+
                 sendBroadcast(Intent("com.hmas.api.ACTION_RELOAD_WALLPAPER"))
 
                 Toast.makeText(this@WallpaperSettingsActivity, "Background restored to default.", Toast.LENGTH_SHORT).show()

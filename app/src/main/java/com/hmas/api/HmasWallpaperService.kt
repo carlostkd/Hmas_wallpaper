@@ -118,17 +118,15 @@ class HackerWallpaperService : WallpaperService() {
 
                 if (prefs.getBoolean("do_initial_sync", false)) {
                     Log.d("HMAS", "Initial sync triggered")
-                    fetchMessage(force = true) {
-                        prefs.edit().putBoolean("do_initial_sync", false).apply()
-                    }
+                    prefs.edit().putBoolean("do_initial_sync", false).apply()
+                    fetchMessage(force = true)
+                } else if (prefs.getBoolean("do_force_sync", false)) {
+                    Log.d("HMAS", "Forced sync triggered from prefs")
+                    prefs.edit().putBoolean("do_force_sync", false).apply()
+                    fetchMessage(force = true)
                 }
 
-                if (prefs.getBoolean("do_force_sync", false)) {
-                    Log.d("HMAS", "Forced sync triggered from prefs")
-                    fetchMessage(force = true) {
-                        prefs.edit().putBoolean("do_force_sync", false).apply()
-                    }
-                }
+
 
                 Log.d("HMAS", "Registering broadcast receiver with both actions")
 
@@ -311,6 +309,11 @@ class HackerWallpaperService : WallpaperService() {
         }
 
 
+        private fun isInPreviewMode(): Boolean {
+            return isPreview
+        }
+
+
         private fun fetchMessage(force: Boolean = false, onSuccess: (() -> Unit)? = null) {
             val currentTime = System.currentTimeMillis()
             val interval = getSyncIntervalMs()
@@ -384,11 +387,12 @@ class HackerWallpaperService : WallpaperService() {
                     }
 
                     //val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
-                    if (prefs.getBoolean("show_notifications", false)) {
+                    if (prefs.getBoolean("show_notifications", false) && !isPreview) {
                         val previewText = wrappedLines.joinToString(" ").take(300)
                         sendNotification("HMAS Update", previewText)
                         return@launch
                     }
+
 
                     scrollIndex = 0
                     message = data
