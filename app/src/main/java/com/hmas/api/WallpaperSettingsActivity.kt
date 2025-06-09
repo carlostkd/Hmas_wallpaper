@@ -274,6 +274,35 @@ class WallpaperSettingsActivity : AppCompatActivity() {
     }
 
 
+    private fun scheduleSyncWorker(context: Context) {
+        val prefs = context.getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
+        val interval = when (prefs.getString("sync_interval", "15m")) {
+            "5m" -> 5L
+            "15m" -> 15L
+            "30m" -> 30L
+            "1h" -> 60L
+            "4h" -> 240L
+            "6h" -> 360L
+            "12h" -> 720L
+            else -> 15L
+        }
+
+        val workRequest = androidx.work.PeriodicWorkRequestBuilder<MessageSyncWorker>(
+            interval, java.util.concurrent.TimeUnit.MINUTES
+        ).build()
+
+        androidx.work.WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "hmas_sync_work",
+            androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+            workRequest
+        )
+
+
+    }
+
+
+
+
     // Efficient downsampling calculator
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
         val (height: Int, width: Int) = options.run { outHeight to outWidth }

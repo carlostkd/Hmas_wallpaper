@@ -10,6 +10,10 @@ import android.text.InputType
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.switchmaterial.SwitchMaterial
+
+
+
 
 class ApiSettingsActivity : AppCompatActivity() {
 
@@ -45,6 +49,7 @@ class ApiSettingsActivity : AppCompatActivity() {
             text = "Enable Chat Mode (chat=on)"
             isChecked = config.contains("chat=on")
         }
+
 
         val chatStyleLabel = TextView(this).apply { text = "Chat Style (chatstyle=)" }
         val spinnerStyle = Spinner(this).apply {
@@ -240,7 +245,16 @@ class ApiSettingsActivity : AppCompatActivity() {
                     .putString("api_key", apiKey)
                     .putString("sync_interval", syncSpinner.selectedItem.toString())
                     .apply()
-                HackerWallpaperService.triggerImmediateFetch(this@ApiSettingsActivity)
+
+
+                WorkerScheduler.scheduleMessageSync(applicationContext)
+
+
+
+
+
+
+
 
 
 
