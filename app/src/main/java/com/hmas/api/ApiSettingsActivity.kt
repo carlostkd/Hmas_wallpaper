@@ -1,304 +1,327 @@
 package com.hmas.api
 
-import com.hmas.api.HackerWallpaperService
 import android.app.Activity
 import android.content.Context
-import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
-import android.text.InputType
-import android.view.View
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.switchmaterial.SwitchMaterial
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+// Removed: import androidx.compose.animation.core.copy // Not used
+// Removed: import androidx.compose.foundation.background // Not directly used
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+// Removed redundant fillMaxSize, fillMaxWidth, padding from foundation.layout if covered by M3
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+// Removed redundant getValue/setValue imports
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+// Removed: import androidx.compose.ui.semantics.disabled // Not directly used
+// Removed: import androidx.compose.ui.text.TextStyle // Can be inferred or use MaterialTheme.typography
+// Removed: import androidx.compose.ui.text.font.FontWeight // Should come from shared SectionHeader's styling
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+// Removed: import androidx.compose.ui.unit.sp // Should come from shared SectionHeader's styling
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 
-
-
-class ApiSettingsActivity : AppCompatActivity() {
-
-    private val chatStyles = arrayOf("neutral", "casual", "sarcastic", "panic", "misc")
-    private val diffModes = arrayOf("classic", "strike", "redacted", "corrupt", "delta", "tagged")
-    private val formatModes = arrayOf("json", "text", "html", "yaml")
-    private val syncOptions = arrayOf("5m", "15m", "30m", "1h", "4h", "6h", "12h")
+class ApiSettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
-        val config = prefs.getString("api_config", "") ?: ""
-        val savedKey = prefs.getString("api_key", "") ?: ""
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 60, 40, 60)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
-        }
-
-        fun sectionHeader(title: String): TextView {
-            return TextView(this).apply {
-                text = title
-                textSize = 18f
-                setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor("#3F51B5"))
-                setPadding(0, 30, 0, 10)
+        setContent {
+            MaterialTheme {
+                ApiSettingsScreen(
+                    onSave = {
+                        Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
+                        setResult(Activity.RESULT_OK)
+                        finish()
+                    }
+                )
             }
         }
+    }
+}
 
-        val enableChat = CheckBox(this).apply {
-            text = "Enable Chat Mode (chat=on)"
-            isChecked = config.contains("chat=on")
-        }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ApiSettingsScreen(
+    viewModel: ApiSettingsViewModel = viewModel(),
+    onSave: () -> Unit
+) {
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.loadSettings(context)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("API Settings") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFF5F5F5)
+                )
+            )
+        },
+        containerColor = Color(0xFFF5F5F5)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+                .verticalScroll(rememberScrollState())
+                .fillMaxSize()
+        ) {
 
 
-        val chatStyleLabel = TextView(this).apply { text = "Chat Style (chatstyle=)" }
-        val spinnerStyle = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ApiSettingsActivity, android.R.layout.simple_spinner_dropdown_item, chatStyles)
-        }
+            SectionHeader("Chat Options")
+            SwitchSetting(
+                text = "Enable Chat Mode (chat=on)",
+                checked = viewModel.enableChat,
+                onCheckedChange = { viewModel.enableChat = it },
+                enabled = viewModel.isGeneralConfigEnabled
+            )
 
-        val enableTalk = CheckBox(this).apply {
-            text = "Enable Talk Mode (talk=on)"
-            isChecked = config.contains("talk=on")
-        }
+            DropdownSetting(
+                label = "Chat Style (chatstyle=)",
+                options = ApiSettingsOptions.CHAT_STYLES,
+                selectedOption = viewModel.selectedChatStyle,
+                onOptionSelected = { viewModel.selectedChatStyle = it },
+                enabled = viewModel.enableChat && viewModel.isGeneralConfigEnabled
+            )
 
-        val talkInput = EditText(this).apply {
-            hint = "Responder Name (talk=)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val talkColorInput = EditText(this).apply {
-            hint = "Talk Color (talkcolor=)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val senderInput = EditText(this).apply {
-            hint = "Sender Label (as=)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val msgInput = EditText(this).apply {
-            hint = "Message Query (msg=)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val maxInput = EditText(this).apply {
-            hint = "Max Messages (max=)"
-            inputType = InputType.TYPE_CLASS_NUMBER
-        }
-
-        val diffInput = EditText(this).apply {
-            hint = "Compare Keywords (e.g. ssh+shell)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val spinnerDiff = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ApiSettingsActivity, android.R.layout.simple_spinner_dropdown_item, diffModes)
-        }
-
-        val spinnerFormat = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ApiSettingsActivity, android.R.layout.simple_spinner_dropdown_item, formatModes)
-        }
-
-        val alertsSwitch = CheckBox(this).apply {
-            text = "Enable Alerts (alerts)"
-            isChecked = config.contains("alerts")
-        }
-
-        val severityInput = EditText(this).apply {
-            hint = "Severity (e.g. high, medium, low)"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        val typesSwitch = CheckBox(this).apply {
-            text = "Include Types (types=on)"
-            isChecked = config.contains("types=on")
-        }
-
-        val lastLikeSwitch = CheckBox(this).apply {
-            text = "Send Last=like"
-        }
-
-        val likedSwitch = CheckBox(this).apply {
-            text = "Send liked"
-        }
-
-        // Uncheck others if last=like or liked are checked
-        fun enforceExclusiveSwitches() {
-            if (lastLikeSwitch.isChecked) {
-                enableChat.isEnabled = false
-                enableTalk.isEnabled = false
-                senderInput.isEnabled = false
-                msgInput.isEnabled = false
-                maxInput.isEnabled = false
-                diffInput.isEnabled = false
-                spinnerDiff.isEnabled = false
-                spinnerFormat.isEnabled = true
-                alertsSwitch.isEnabled = false
-                severityInput.isEnabled = false
-                typesSwitch.isEnabled = false
-            } else if (likedSwitch.isChecked) {
-                enableChat.isEnabled = false
-                enableTalk.isEnabled = false
-                senderInput.isEnabled = false
-                msgInput.isEnabled = false
-                maxInput.isEnabled = false
-                diffInput.isEnabled = false
-                spinnerDiff.isEnabled = false
-                spinnerFormat.isEnabled = true  // ✅ allow format
-                alertsSwitch.isEnabled = false
-                severityInput.isEnabled = false
-                typesSwitch.isEnabled = false
-            } else {
-                enableChat.isEnabled = true
-                enableTalk.isEnabled = true
-                senderInput.isEnabled = true
-                msgInput.isEnabled = true
-                maxInput.isEnabled = true
-                diffInput.isEnabled = true
-                spinnerDiff.isEnabled = true
-                spinnerFormat.isEnabled = true
-                alertsSwitch.isEnabled = true
-                severityInput.isEnabled = true
-                typesSwitch.isEnabled = true
+            SectionHeader("Talk Responder")
+            SwitchSetting(
+                text = "Enable Talk Mode (talk=on)",
+                checked = viewModel.enableTalk,
+                onCheckedChange = { viewModel.enableTalk = it },
+                enabled = viewModel.isGeneralConfigEnabled
+            )
+            if (viewModel.isTalkSectionVisible) {
+                TextFieldSetting(
+                    value = viewModel.talkResponderName,
+                    onValueChange = { viewModel.talkResponderName = it },
+                    label = "Responder Name (talk=)",
+                    enabled = viewModel.isGeneralConfigEnabled
+                )
+                TextFieldSetting(
+                    value = viewModel.talkColor,
+                    onValueChange = { viewModel.talkColor = it },
+                    label = "Talk Color (talkcolor=)",
+                    enabled = viewModel.isGeneralConfigEnabled
+                )
             }
-        }
 
+            SectionHeader("Message Options")
+            TextFieldSetting(
+                value = viewModel.senderLabel,
+                onValueChange = { viewModel.senderLabel = it },
+                label = "Sender Label (as=)",
+                enabled = viewModel.isGeneralConfigEnabled
+            )
+            TextFieldSetting(
+                value = viewModel.messageQuery,
+                onValueChange = { viewModel.messageQuery = it },
+                label = "Message Query (msg=)",
+                enabled = viewModel.isGeneralConfigEnabled
+            )
+            TextFieldSetting(
+                value = viewModel.maxMessages,
+                onValueChange = { viewModel.maxMessages = it },
+                label = "Max Messages (max=)",
+                keyboardType = KeyboardType.Number,
+                enabled = viewModel.isGeneralConfigEnabled
+            )
 
-        lastLikeSwitch.setOnCheckedChangeListener { _, _ -> enforceExclusiveSwitches() }
-        likedSwitch.setOnCheckedChangeListener { _, _ -> enforceExclusiveSwitches() }
+            SectionHeader("Diff & Comparisons")
+            TextFieldSetting(
+                value = viewModel.compareKeywords,
+                onValueChange = { viewModel.compareKeywords = it },
+                label = "Compare Keywords (e.g. ssh+shell)",
+                enabled = viewModel.isGeneralConfigEnabled
+            )
+            DropdownSetting(
+                label = "Diff Mode",
+                options = ApiSettingsOptions.DIFF_MODES,
+                selectedOption = viewModel.selectedDiffMode,
+                onOptionSelected = { viewModel.selectedDiffMode = it },
+                enabled = viewModel.compareKeywords.isNotEmpty() && viewModel.isGeneralConfigEnabled
+            )
 
-        val syncLabel = TextView(this).apply { text = "Sync Interval" }
+            SectionHeader("Output Format")
+            DropdownSetting(
+                label = "Format",
+                options = ApiSettingsOptions.FORMAT_MODES,
+                selectedOption = viewModel.selectedFormatMode,
+                onOptionSelected = { viewModel.selectedFormatMode = it },
+                enabled = true
+            )
 
-        val syncSpinner = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ApiSettingsActivity, android.R.layout.simple_spinner_dropdown_item, syncOptions)
-        }
+            SectionHeader("Alerts and Types")
+            CheckboxSetting(
+                text = "Enable Alerts (alerts)",
+                checked = viewModel.enableAlerts,
+                onCheckedChange = { viewModel.enableAlerts = it },
+                enabled = viewModel.isGeneralConfigEnabled
+            )
+            TextFieldSetting(
+                value = viewModel.severity,
+                onValueChange = { viewModel.severity = it },
+                label = "Severity (e.g. high, medium, low)",
+                enabled = viewModel.enableAlerts && viewModel.isGeneralConfigEnabled
+            )
+            CheckboxSetting(
+                text = "Include Types (types=on)",
+                checked = viewModel.includeTypes,
+                onCheckedChange = { viewModel.includeTypes = it },
+                enabled = viewModel.isGeneralConfigEnabled
+            )
 
-        val apiKeyInput = EditText(this).apply {
-            hint = "API Key (required)"
-            setText(savedKey)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-        }
-
-        fun updateTalkVisibility() {
-            val show = enableTalk.isChecked
-            talkInput.visibility = if (show) View.VISIBLE else View.GONE
-            talkColorInput.visibility = if (show) View.VISIBLE else View.GONE
-        }
-
-        enableTalk.setOnCheckedChangeListener { _, _ -> updateTalkVisibility() }
-        updateTalkVisibility()
-
-        val saveBtn = Button(this).apply {
-            text = "Save Configuration"
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setTextColor(Color.WHITE)
-            setOnClickListener {
-                val params = mutableListOf<String>()
-                val apiKey = apiKeyInput.text.toString()
-
-                val hasLike = lastLikeSwitch.isChecked
-                val hasLiked = likedSwitch.isChecked
-
-                if (hasLike) {
-                    params.add("last=like")
-                } else if (hasLiked) {
-                    params.add("liked")
-                } else {
-                    val asValue = senderInput.text.toString()
-                    if (asValue.isNotEmpty()) params.add("as=$asValue")
-
-                    val msgValue = msgInput.text.toString()
-                    if (msgValue.isNotEmpty()) params.add("msg=$msgValue")
-
-                    if (enableChat.isChecked) {
-                        params.add("chat=on")
-                        params.add("chatstyle=" + spinnerStyle.selectedItem.toString())
-                    }
-
-                    if (enableTalk.isChecked) {
-                        params.add("talk=on")
-                        if (talkInput.text.isNotEmpty()) params.add("talk=" + talkInput.text.toString())
-                        if (talkColorInput.text.isNotEmpty()) params.add("talkcolor=" + talkColorInput.text.toString())
-                    }
-
-                    if (maxInput.text.isNotEmpty()) params.add("max=" + maxInput.text.toString())
-
-                    val diffText = diffInput.text.toString()
-                    if (diffText.isNotEmpty()) {
-                        params.add("diff=$diffText")
-                        params.add("diffmode=" + spinnerDiff.selectedItem.toString())
-                    }
-
-                    if (spinnerFormat.selectedItem.toString() != "json") {
-                        params.add("format=" + spinnerFormat.selectedItem.toString())
-                    }
-
-                    if (alertsSwitch.isChecked) params.add("alerts")
-                    if (severityInput.text.isNotEmpty()) params.add("severity=" + severityInput.text.toString())
-                    if (typesSwitch.isChecked) params.add("types=on")
+            SectionHeader("Special Commands")
+            CheckboxSetting(
+                text = "Send Last=like",
+                checked = viewModel.sendLastLike,
+                onCheckedChange = {
+                    viewModel.sendLastLike = it
+                    if (it) viewModel.sendLiked = false
                 }
+            )
+            CheckboxSetting(
+                text = "Send liked",
+                checked = viewModel.sendLiked,
+                onCheckedChange = {
+                    viewModel.sendLiked = it
+                    if (it) viewModel.sendLastLike = false
+                }
+            )
 
-                val finalQuery = params.joinToString("&")
+            SectionHeader("Sync Interval")
+            DropdownSetting(
+                label = "Sync Interval",
+                options = ApiSettingsOptions.SYNC_OPTIONS,
+                selectedOption = viewModel.selectedSyncInterval,
+                onOptionSelected = { viewModel.selectedSyncInterval = it },
+                enabled = true
+            )
 
-                prefs.edit()
-                    .putString("api_config", finalQuery)
-                    .putString("api_key", apiKey)
-                    .putString("sync_interval", syncSpinner.selectedItem.toString())
-                    .apply()
+            SectionHeader("API Key")
+            TextFieldSetting(
+                value = viewModel.apiKey,
+                onValueChange = { viewModel.apiKey = it },
+                label = "API Key (required)",
+                isPassword = false, // Set true if you want visual transformation
+                enabled = true
+            )
 
+            Spacer(Modifier.height(24.dp))
 
-                WorkerScheduler.scheduleMessageSync(applicationContext)
+            Button(
+                onClick = {
+                    viewModel.saveSettings(context) {
+                        onSave()
 
-
-
-
-
-
-
-
-
-
-
-                Toast.makeText(this@ApiSettingsActivity, "Saved", Toast.LENGTH_SHORT).show()
-                setResult(Activity.RESULT_OK)
-                finish()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                enabled = viewModel.apiKey.isNotBlank()
+            ) {
+                Text("Save Configuration", color = Color.White)
             }
-
+            Spacer(Modifier.height(20.dp))
         }
+    }
+}
 
-        layout.apply {
-            addView(sectionHeader("Chat Configuration"))
-            addView(enableChat)
-            addView(chatStyleLabel)
-            addView(spinnerStyle)
-            addView(sectionHeader("Talk Responder"))
-            addView(enableTalk)
-            addView(talkInput)
-            addView(talkColorInput)
-            addView(sectionHeader("Message Options"))
-            addView(senderInput)
-            addView(msgInput)
-            addView(maxInput)
-            addView(sectionHeader("Diff & Comparisons"))
-            addView(diffInput)
-            addView(spinnerDiff)
-            addView(sectionHeader("Output Format"))
-            addView(spinnerFormat)
-            addView(sectionHeader("Alerts and Types"))
-            addView(alertsSwitch)
-            addView(severityInput)
-            addView(typesSwitch)
-            addView(sectionHeader("Special Commands"))
-            addView(lastLikeSwitch)
-            addView(likedSwitch)
-            addView(sectionHeader("Sync Interval"))
-            addView(syncLabel)
-            addView(syncSpinner)
-            addView(sectionHeader("API Key"))
-            addView(apiKeyInput)
-            addView(saveBtn)
-        }
 
-        setContentView(ScrollView(this).apply { addView(layout) })
+
+@Composable
+fun SwitchSetting(
+    text: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled
+        )
+    }
+}
+
+@Composable
+fun CheckboxSetting(
+    text: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null,
+            enabled = enabled
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text)
+    }
+}
+
+
+
+@Composable
+fun TextFieldSetting(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    enabled: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isPassword: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        singleLine = true
+    )
+}
+
+@Preview(showBackground = true, device = "spec:width=360dp,height=1200dp,dpi=480")
+@Composable
+fun ApiSettingsScreenPreview() {
+    MaterialTheme {
+        ApiSettingsScreen(onSave = {})
     }
 }

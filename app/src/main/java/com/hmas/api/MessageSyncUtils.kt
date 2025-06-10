@@ -29,7 +29,7 @@ object MessageSyncUtils {
                 val client = OkHttpClient()
                 val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: return@launch
-                Log.d("HMAS", "Fetched message: $body")
+
 
                 val json = JSONObject(body)
                 val message = json.toString(4) // Pretty format
@@ -38,12 +38,12 @@ object MessageSyncUtils {
                     val preview = message.take(300)
                     NotificationUtils.sendNotification(context, "HMAS Message", preview)
                 } else {
-                    // Persist message for card rendering
+
                     prefs.edit().putString("last_card_message", message).apply()
                 }
 
             } catch (e: Exception) {
-                Log.e("HMAS", "Background fetch failed", e)
+
             }
         }
     }

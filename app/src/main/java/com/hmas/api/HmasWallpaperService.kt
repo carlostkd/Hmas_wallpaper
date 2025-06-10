@@ -10,13 +10,19 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.MotionEvent
 import android.view.SurfaceHolder
+
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.geometry.isEmpty
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+
+import kotlin.io.path.inputStream
 import kotlin.math.max
+import kotlin.text.clear
 
 class HackerWallpaperService : WallpaperService() {
     companion object {
@@ -51,7 +57,10 @@ class HackerWallpaperService : WallpaperService() {
         private var lastSyncTime: Long = 0L
         private var scrollIndex = 0
         private val linesPerPage = 6
-        private var wrappedLines: List<String> = listOf()
+        private val wrappedLines: MutableList<String> = mutableListOf()
+
+
+
 
         private var cardX = 50f
         private var cardY = 300f
@@ -69,19 +78,19 @@ class HackerWallpaperService : WallpaperService() {
 
         private val settingsUpdateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                Log.d("HMAS", "[SYNC] Broadcast received: ${intent?.action}")
+
                 when (intent?.action) {
                     "com.hmas.api.ACTION_SETTINGS_UPDATED" -> {
-                        Log.d("HMAS", "[SYNC] Handling ACTION_SETTINGS_UPDATED — redraw")
+
                         loadBackgroundImage()
                         draw()
                     }
                     "com.hmas.api.ACTION_FORCE_SYNC" -> {
-                        Log.d("HMAS", "[SYNC] Handling ACTION_FORCE_SYNC — calling fetchMessage(force = true)")
+
                         fetchMessage(force = true)
                     }
                     else -> {
-                        Log.w("HMAS", "[SYNC] Unknown broadcast received: ${intent?.action}")
+
                     }
                 }
             }
@@ -246,7 +255,9 @@ class HackerWallpaperService : WallpaperService() {
                 val json = JSONObject(rawMessage)
                 val pretty = json.toString(4)
                 val maxWidth = surfaceHolder.surfaceFrame.width()
-                wrappedLines = wrapText(pretty, maxWidth)
+                val newLines = wrapText(pretty, maxWidth)
+                wrappedLines.clear()
+                wrappedLines.addAll(newLines)
                 scrollIndex = 0
                 Log.d("HMAS", "Loaded wrapped lines from cached prefs")
             } catch (e: Exception) {
@@ -271,54 +282,204 @@ class HackerWallpaperService : WallpaperService() {
             return lines
         }
 
-        private fun fetchMessage(force: Boolean = false) {
-            Log.d("HMAS", "[SYNC] fetchMessage called, force = $force, thread = ${Thread.currentThread().name}")
+        private fun fetchMessage(force: Boolean = false, onSuccess: (() -> Unit)? = null) {
+            Log.d("HMAS_FETCH", "fetchMessage called. Force: $force, Thread: ${Thread.currentThread().name}")
+
+
+
             val currentTime = System.currentTimeMillis()
-            if (!force && currentTime - lastSyncTime < getSyncIntervalMs()) return
-            if (isFetching) scope.coroutineContext.cancelChildren()
+            if (!force && currentTime - lastSyncTime < getSyncIntervalMs()) {
+                Log.d("HMAS_FETCH", "Skipped: interval not met.")
+                return
+            }
+
+            if (isFetching) {
+                Log.d("HMAS_FETCH", "Cancelling previous fetch.")
+                scope.coroutineContext.cancelChildren()
+            }
 
             isFetching = true
             lastSyncTime = currentTime
 
             scope.launch {
+                var urlStringForLoggingOnError = "URL_CONSTRUCTION_PENDING"
+                var requestedFormat = "json"
+
                 try {
                     val prefs = getSharedPreferences("wallpaper_prefs", Context.MODE_PRIVATE)
                     val query = prefs.getString("api_config", "") ?: ""
                     val key = prefs.getString("api_key", "") ?: ""
-                    val alerts = prefs.getBoolean("api_alerts", false)
-                    val severity = prefs.getString("api_severity", "") ?: ""
-                    val types = prefs.getBoolean("api_types", false)
 
-                    val extraParams = mutableListOf<String>()
-                    if (alerts) extraParams.add("alerts")
-                    if (severity.isNotEmpty()) extraParams.add("severity=$severity")
-                    if (types) extraParams.add("types=on")
-
-                    val joinedParams = listOf(query, *extraParams.toTypedArray())
-                        .filter { it.isNotBlank() }
-                        .joinToString("&")
-
-                    val urlString = "https://carlostkd.ch/hmas/api.php?$joinedParams&apikey=$key"
-                    val conn = URL(urlString).openConnection() as HttpURLConnection
-                    val data = conn.inputStream.bufferedReader().readText()
-
-                    prefs.edit().putString("last_card_message", data).apply()
-
-                    wrappedLines = wrapText(JSONObject(data).toString(4), surfaceHolder.surfaceFrame.width())
-
-                    if (prefs.getBoolean("show_notifications", false) && !isPreview) {
-                        val preview = wrappedLines.joinToString(" ").take(300)
-                        sendNotification("HMAS Update", preview)
+                    val paramsForUrl = mutableListOf<String>()
+                    if (query.isNotBlank()) {
+                        paramsForUrl.add(query)
+                        if (query.contains("format=text", ignoreCase = true)) {
+                            requestedFormat = "text"
+                            Log.d("HMAS_FETCH", "Requested format set to 'text' from query param.")
+                        } else if (query.contains("format=json", ignoreCase = true)) {
+                            requestedFormat = "json"
+                            Log.d("HMAS_FETCH", "Requested format set to 'json' from query param.")
+                        } else {
+                            Log.d("HMAS_FETCH", "Query does not contain explicit format. Using '$requestedFormat'.")
+                        }
+                    } else {
+                        Log.d("HMAS_FETCH", "Query is blank. Using requestedFormat '$requestedFormat'.")
                     }
 
-                    scrollIndex = 0
-                    handler.post { draw() }
+                    val joinedParams = paramsForUrl.filter { it.isNotBlank() }.joinToString("&")
+                    val baseApiUrl = "https://carlostkd.ch/hmas/api.php"
+                    val finalUrlString = if (joinedParams.isNotEmpty() || key.isNotEmpty()) {
+                        val allParams = listOfNotNull(
+                            if (joinedParams.isNotEmpty()) joinedParams else null,
+                            if (key.isNotEmpty()) "apikey=$key" else null
+                        ).joinToString("&")
+                        "$baseApiUrl?$allParams"
+                    } else {
+                        baseApiUrl
+                    }
+                    urlStringForLoggingOnError = finalUrlString
+
+
+
+                    val url = java.net.URL(finalUrlString)
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 10000
+
+                    val responseCode = conn.responseCode
+                    val rawDataFromServer: String? = if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                        conn.inputStream.bufferedReader().use { it.readText() }
+                    } else {
+                        val errorBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "No error body"
+
+                        null
+                    }
+
+                    if (rawDataFromServer != null) {
+
+                        prefs.edit().putString("last_card_message", rawDataFromServer).apply()
+                        message = rawDataFromServer // message MUST BE VAR
+
+
+                        val textToProcess: String = if (requestedFormat == "json") {
+                            try {
+                                org.json.JSONObject(rawDataFromServer).toString(4)
+
+                            } catch (e: org.json.JSONException) {
+
+                                rawDataFromServer
+                            }
+                        } else {
+
+                            rawDataFromServer
+
+                        }
+
+
+                        val tempLines = mutableListOf<String>()
+                        val linesFromData = textToProcess.trim().split('\n')
+
+                        if (linesFromData.isNotEmpty()) {
+
+
+                        } else {
+
+                        }
+
+                        val currentSurfaceWidth = surfaceHolder.surfaceFrame?.width() ?: 1080
+                        val effectiveMaxWidth = currentSurfaceWidth - 180f
+
+
+                        for ((index, line) in linesFromData.withIndex()) {
+
+                            if (line.isBlank() && linesFromData.size > 1) {
+                                tempLines.add("")
+
+                                continue
+                            }
+
+                            val words = line.split(" ")
+                            var currentLineSegment = "" // Local var, OK
+                            for ((wordIndex, word) in words.withIndex()) {
+                                if (word.isEmpty()) continue
+
+                                val testLine = if (currentLineSegment.isEmpty()) word else "$currentLineSegment $word"
+                                val measuredWidth = textPaint.measureText(testLine)
+
+                                if (measuredWidth < effectiveMaxWidth) {
+                                    currentLineSegment = testLine
+                                } else {
+                                    if (currentLineSegment.isNotEmpty()) {
+                                        tempLines.add(currentLineSegment)
+
+                                    }
+                                    currentLineSegment = word
+                                    if (textPaint.measureText(currentLineSegment) >= effectiveMaxWidth) {
+                                        tempLines.add(currentLineSegment)
+
+                                        currentLineSegment = ""
+                                    }
+                                }
+                            }
+                            if (currentLineSegment.isNotEmpty()) {
+                                tempLines.add(currentLineSegment)
+
+                            }
+                        }
+
+
+                        if (tempLines.isNotEmpty()) {
+
+                        }
+
+                        wrappedLines.clear()
+                        wrappedLines.addAll(tempLines)
+
+                        if (wrappedLines.isNotEmpty()){
+
+                        } else {
+
+                            if (rawDataFromServer.isNotBlank() && tempLines.isEmpty()){
+
+                            }
+                        }
+
+                        if (prefs.getBoolean("show_notifications", false) && !isPreview) {
+                            val preview = wrappedLines.joinToString("\n").take(300)
+                            sendNotification("HMAS Update", preview)
+                        }
+                        scrollIndex = 0
+
+                    } else {
+
+                        wrappedLines.clear()
+                        wrappedLines.add("Failed to load. Code: $responseCode")
+                        scrollIndex = 0
+                    }
+
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+
+                        draw()
+                        onSuccess?.invoke()
+                    }
+
                 } catch (e: Exception) {
-                    wrappedLines = listOf("Error loading message")
-                    scrollIndex = 0
-                    handler.post { draw() }
+
+                    try {
+                        wrappedLines.clear() // OK
+                        wrappedLines.add("Error: ${e.javaClass.simpleName}") // OK
+                        message = "Error: ${e.javaClass.simpleName}" // message MUST BE VAR
+                        scrollIndex = 0 // scrollIndex MUST BE VAR
+                    } catch (se: Exception) {
+
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        try { draw() } catch (de: Exception) { Log.e("HMAS_FETCH", "Exception drawing error state", de) }
+                    }
                 } finally {
-                    isFetching = false
+                    isFetching = false // isFetching MUST BE VAR
+
                 }
             }
         }

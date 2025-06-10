@@ -24,7 +24,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Wallpaper Service -->
+
         <service
             android:name=".HackerWallpaperService"
             android:permission="android.permission.BIND_WALLPAPER"
@@ -37,7 +37,7 @@
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>
 
-            <!-- Wallpaper configuration metadata -->
+
             <meta-data
                 android:name="android.service.wallpaper"
                 android:resource="@xml/wallpaper" />

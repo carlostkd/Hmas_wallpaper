@@ -6,27 +6,38 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+
+// import org.json.JSONObject
+// import java.net.HttpURLConnection
+// import java.net.URL
 
 class MessageSyncWorker(
-    private val context: Context,
+
+    appContext: Context,
     workerParams: WorkerParameters
-) : CoroutineWorker(context, workerParams) {
+) : CoroutineWorker(appContext, workerParams) {
+
+
+    companion object {
+        private const val TAG = "MessageSyncWorker"
+    }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        try {
-            Log.d("HMAS", "[WORKER] WorkManager triggered MessageSyncWorker")
 
-            // Trigger the same sync mechanism used in settings
-            HackerWallpaperService.triggerImmediateFetch(context)
+
+
+        try {
+
+
+
+            HackerWallpaperService.triggerImmediateFetch(applicationContext)
+
 
             Result.success()
         } catch (e: Exception) {
-            Log.e("HMAS", "WorkManager trigger failed", e)
+
+
             Result.retry()
         }
     }
-
 }
